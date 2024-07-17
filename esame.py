@@ -3,47 +3,48 @@ class ExamException(Exception):
 
 class CSVTimeSeriesFile():
     def __init__(self, name):
-        
-        self.name = name
+        self.name = name 
         
     def get_data(self):
+        #controllo che il nome del file sia istanza di string (o di una sua sottoclasse)
+        if not isinstance(self.name,str):
+            raise ExamException ('Il nome del file deve essere una stringa.')
         
-        self.can_read = True
+        #provo ad aprire il file e leggere la prima riga e se riesce chiudo il file di test, altrimenti sollevo un'eccezione.
         try:
-            my_file = open(self.name, 'r')
-            my_file.readline()  #gestire questa parte - così viene saltata la prima linea, in caso occuparsi dell'intestazione?
-        except Exception:
-            self.can_read = False
+            test_file = open(self.name, 'r')
+            test_file.readline()
+            test_file.close()
+        except Exception as e:
+           raise ExamException ('Errore in apertura o lettura del file: {}'.format(e))
         
-        if not self.can_read:
-            my_file.close()
-            raise ExamException ('Errore nell\'apertura o nella lettura del file')
+        file = open(self.name, 'r') #ora posso sicuramente aprire il file
+        data = [] # preparo la lista che conterrà le liste [epoch, temperature], con epoch e temperature valori numerici
         
-        else:
-            #creo una lista vuota che conterrà poi la lista di liste 
-            data = []
-            for line in my_file:
-                columns = line.strip().split(',')
-                try: 
-                   epoch = int(columns[0])
-                   temperature = float(columns[1]) #si ferma a due elementi!!!!
-                   data.append([epoch,temperature])
-                except Exception:
-                    pass   
-            #controllo che non ci sia un timestamp fuori ordine o duplicato in caso alzo un'eccezione
-            for i in range(len(data)-1):
-                   if data[i][0] >= data[i+1][0]:
-                       raise ExamException('Timestamp fuori ordine o duplicato: {} dopo {}'.format(data[i+1][0],data[i][0]))
-            return data
+        for line in file:
+            fields = [field.strip() for field in line.split(',')]#ciascuna lista fields (per ogni riga) sarà ['field_1', 'field_2', ..., 'field_n'] se ci sono "n" campi
+            #tentativo di cast per i primi due elementi della lista fields - epoch, temperature
+            try: 
+                epoch = int(float(fields[0])) #cast del primo elemento (epoch) prima a float (perché potrebbe esserlo) poi, se riuscito, a int
+                temperature = float(fields[1]) #cast del secondo elemento (temperature) a float
+                data.append([epoch,temperature]) #se i cast sono avvenuti con successo, aggiungo alla lista "data" la lista [epoch, temperature]
+            except Exception:
+                pass   #qualsiasi eccezione (e.g. len(fields) < 2, cast non riusciti, etc.) viene gestita ignorando la riga
+        file.close() #ora posso chiudere il file
+        #controllo che non ci siano timestamp fuori ordine o duplicati
+        for i in range(len(data)-1): #ciclo sulle liste confrontando sempre il primo elemento (i.e. epoch) di una lista con quello della successiva
+                if data[i][0] >= data[i+1][0]:
+                    raise ExamException("Timestamp fuori ordine o duplicato: {} all'indice {}, dopo {} all'indice {}".format(data[i+1][0],i+1,data[i][0],i))
+        return data
 
 def compute_daily_max_difference(time_series):
-    daily_max_difference_list = [] #creo la lista che conterrà le massime differenze di temperatura giornaliere
-    i = 0
+    daily_max_difference_list = [] #preparo una lista che conterrà le escursioni termiche (massima diff. di temperatura nella giornata)
+    i = 0 
     while i < len(time_series):
         epoch = time_series[i][0]
         day_start_epoch = epoch - (epoch % 86400)
         day_end_epoch = day_start_epoch + 86400
-
+        
         min_temperature = time_series[i][1]
         max_temperature = time_series[i][1]
         count_temperatures = 0
@@ -61,15 +62,14 @@ def compute_daily_max_difference(time_series):
         if count_temperatures == 1:
             daily_max_difference_list.append(None)
         else:
-            daily_max_difference_list.append(max_temperature - min_temperature)
+            daily_max_difference_list.append(round(max_temperature - min_temperature,3)) # round to avoid
 
     return daily_max_difference_list
-    
-    
+
 
     
-                    
+
 time_series_file = CSVTimeSeriesFile(name='data.csv')
 time_series = time_series_file.get_data()
-lista_differenze = compute_daily_max_difference(time_series)
-print(lista_differenze)
+print(compute_daily_max_difference(time_series))
+
