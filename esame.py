@@ -6,11 +6,11 @@ class CSVTimeSeriesFile():
         self.name = name 
         
     def get_data(self):
-        #controllo che il nome del file sia istanza di string (o di una sua sottoclasse)
-        if not isinstance(self.name,str):
+        #controllo che il nome del file sia una stringa
+        if not isinstance(self.name, str):
             raise ExamException ('Il nome del file deve essere una stringa.')
         
-        #provo ad aprire il file e leggere la prima riga e se riesce chiudo il file di test, altrimenti sollevo un'eccezione.
+        #provo ad aprire il file e leggere la prima riga
         try:
             test_file = open(self.name, 'r')
             test_file.readline()
@@ -18,32 +18,35 @@ class CSVTimeSeriesFile():
         except Exception as e:
            raise ExamException ('Errore in apertura o lettura del file: {}'.format(e))
         
-        file = open(self.name, 'r') #ora posso sicuramente aprire il file
+        file = open(self.name, 'r')
         data = [] # preparo la lista che conterrà le liste [epoch, temperature], con epoch e temperature valori numerici
         
         for line in file:
-            fields = [field.strip() for field in line.split(',')]#ciascuna lista fields (per ogni riga) sarà ['field_1', 'field_2', ..., 'field_n'] se ci sono "n" campi
-            #tentativo di cast per i primi due elementi della lista fields - epoch, temperature
+            fields = [field.strip() for field in line.split(',')]
+            #tentativo di cast per i primi due elementi (epoch, temperature) della lista fields
             try: 
                 epoch = int(float(fields[0])) #cast del primo elemento (epoch) prima a float (perché potrebbe esserlo) poi, se riuscito, a int
                 temperature = float(fields[1]) #cast del secondo elemento (temperature) a float
                 data.append([epoch,temperature]) #se i cast sono avvenuti con successo, aggiungo alla lista "data" la lista [epoch, temperature]
             except Exception:
-                pass   #qualsiasi eccezione (e.g. len(fields) < 2, cast non riusciti, etc.) viene gestita ignorando la riga
+                pass   #qualsiasi eccezione viene gestita ignorando la riga
+        
         file.close() #ora posso chiudere il file
+        
         #controllo che non ci siano timestamp fuori ordine o duplicati
         for i in range(len(data)-1): #ciclo sulle liste confrontando sempre il primo elemento (i.e. epoch) di una lista con quello della successiva
                 if data[i][0] >= data[i+1][0]:
                     raise ExamException("Timestamp fuori ordine o duplicato: {} all'indice {}, dopo {} all'indice {}".format(data[i+1][0],i+1,data[i][0],i))
+        
         return data
 
-#funzione che ritornerà un dizionario {day : list of temperatures for that day}
+
 def group_temperatures_by_day(time_series):
-    #preparo un dizionario che avrà come chiavi gli epoch che segnano l'inizio della giornata e come valori le liste di temperature per quella giornata
+    #preparo un dizionario che avrà come chiavi gli epoch che segnano l'inizio della giornata e come valori le liste di temperature giornaliere
     daily_temperatures_dict = {} 
-    for lista in time_series: #per ogni lista in time_series che è una lista di liste
-        epoch = lista[0] #epoch è uguale al primo elemento di questa lista
-        temperature = lista[1] #temperature è uguale al secondo elemento di questa lista
+    for lista in time_series: #(time_series è una lista di liste)
+        epoch = lista[0]
+        temperature = lista[1]
         day_start_epoch = epoch - (epoch % 86400) # a partire da un epoch trovo l'inizio di quella giornata 
         if day_start_epoch not in daily_temperatures_dict: #se non è già presente come chiave del mio dizionario 
             daily_temperature_list = [] #preparo un lista vuota che avrà le temperature di quella giornata
@@ -67,10 +70,9 @@ def compute_daily_max_difference(time_series):
         if len(list_of_temperatures_per_day) > 1:
             min_temperature = min(list_of_temperatures_per_day) #min() restituisce il minimo della lista
             max_temperature = max(list_of_temperatures_per_day) #max() restituisce il massimo della lista
-            daily_max_difference.append(round(max_temperature - min_temperature,3)) #faccio max - min, arrotondo alla terza cifra decimale e aggiundo alla lista
-        
-        #se la lista non ha almeno 1 elemento allora la differenza non è definita
+            daily_max_difference.append(round(max_temperature - min_temperature,3)) #faccio max - min, arrotondo alla terza cifra decimale e aggiungo alla lista
         else:
+            #se la lista non ha almeno 2 elementi allora la differenza non è definita
             daily_max_difference.append(None) #aggiungo None alla lista
     
     return daily_max_difference
