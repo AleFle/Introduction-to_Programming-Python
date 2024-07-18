@@ -37,39 +37,40 @@ class CSVTimeSeriesFile():
                     raise ExamException("Timestamp fuori ordine o duplicato: {} all'indice {}, dopo {} all'indice {}".format(data[i+1][0],i+1,data[i][0],i))
         return data
 
-def compute_daily_max_difference(time_series):
-    daily_max_difference_list = [] #preparo una lista che conterrà le escursioni termiche (massima diff. di temperatura nella giornata)
-    i = 0 
-    while i < len(time_series):
-        epoch = time_series[i][0]
-        day_start_epoch = epoch - (epoch % 86400)
-        day_end_epoch = day_start_epoch + 86400
+#funzione che ritornerà un dizionario {day : list of temperatures for that day}
+def group_temperatures_by_day(time_series):
+    #preparo un dizionario che avrà come chiavi gli epoch che segnano l'inizio della giornata e come valori le liste di temperature per quella giornata
+    daily_temperatures_dict = {} 
+    for lista in time_series: #per ogni lista in time_series che è una lista di liste
+        epoch = lista[0] #epoch è uguale al primo elemento di questa lista
+        temperature = lista[1] #temperature è uguale al secondo elemento di questa lista
+        day_start_epoch = epoch - (epoch % 86400) # a partire da un epoch trovo l'inizio di quella giornata 
+        if day_start_epoch not in daily_temperatures_dict: #se non è già presente come chiave del mio dizionario 
+            daily_temperature_list = [] #preparo un lista vuota che avrà le temperature di quella giornata
+            daily_temperatures_dict[day_start_epoch] = daily_temperature_list #aggiungo la chiave al mio dizionario e ci associo la lista
         
-        min_temperature = time_series[i][1]
-        max_temperature = time_series[i][1]
-        count_temperatures = 0
-
-        # Iterate to find all temperatures within the same day
-        while i < len(time_series) and time_series[i][0] < day_end_epoch:
-            temperature = time_series[i][1]
-            if temperature < min_temperature:
-                min_temperature = temperature
-            if temperature > max_temperature:
-                max_temperature = temperature
-            i += 1
-            count_temperatures +=1
-
-        if count_temperatures == 1:
-            daily_max_difference_list.append(None)
-        else:
-            daily_max_difference_list.append(round(max_temperature - min_temperature,3)) # round to avoid
-
-    return daily_max_difference_list
-
-
+        daily_temperature_list.append(temperature) #aggiungo le temperature alla lista
+        #quando ci sarà un nuovo day_start_epoch (calcolato da epoch preso dalle liste nell'iterazione)-> nuova chiave, nuova lista, aggiungo elementi
+        #così per tutta l'iterazione
     
+    return daily_temperatures_dict
 
-time_series_file = CSVTimeSeriesFile(name='data.csv')
-time_series = time_series_file.get_data()
-print(compute_daily_max_difference(time_series))
 
+def compute_daily_max_difference(time_series):
+    daily_max_difference = [] #preparo una lista che conterrà le escursioni termiche
+    daily_temperatures_dict = group_temperatures_by_day(time_series) #creazione del dizionario
+    list_days_start_epoch = list(daily_temperatures_dict) #la funzione list() sul dizionario mi crea una lista contenente le chiavi del dizionario
+    for key in list_days_start_epoch:
+        list_of_temperatures_per_day = daily_temperatures_dict[key] #salvo la lista per quella giornata
+        
+        #se la lista ha più di 1 elemento allora la differenza è definita
+        if len(list_of_temperatures_per_day) > 1:
+            min_temperature = min(list_of_temperatures_per_day) #min() restituisce il minimo della lista
+            max_temperature = max(list_of_temperatures_per_day) #max() restituisce il massimo della lista
+            daily_max_difference.append(round(max_temperature - min_temperature,3)) #faccio max - min, arrotondo alla terza cifra decimale e aggiundo alla lista
+        
+        #se la lista non ha almeno 1 elemento allora la differenza non è definita
+        else:
+            daily_max_difference.append(None) #aggiungo None alla lista
+    
+    return daily_max_difference
